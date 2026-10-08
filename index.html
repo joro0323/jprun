@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>일본어 어휘런</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+<style>
+/* Layout: one fixed game frame (10:7) centered on a night-navy ground; HUD + quiz card float over the canvas */
+:root{
+  --ground:#121932; --frame:#435078; --panel:#252c47e8; --panel-line:#ffffff55;
+  --paper:#fff4ce; --ink:#342b34; --wood:#9e7044; --gold:#ffce55; --gold-deep:#bd783a;
+  --good:#fff2a8; --bad:#ffb4c4; --muted:#e5e8f3;
+  --f-jp:"M PLUS Rounded 1c","Jua","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  --f-ko:"Jua","M PLUS Rounded 1c","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--ground);color:#fff;font-family:var(--f-ko)}
+body{overflow:hidden;touch-action:none}
+#wrap{height:100%;display:grid;place-items:center;padding:8px}
+#frame{position:relative;width:min(1000px,100%);height:100%;max-height:720px;max-width:100%;aspect-ratio:10/7;border:3px solid var(--frame);border-radius:14px;overflow:hidden;background:#8dd9ef;box-shadow:0 14px 45px #0008}
+canvas{width:100%;height:100%;display:block}
+.hud{position:absolute;z-index:2;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;pointer-events:none}
+.box{background:var(--panel);border:2px solid var(--panel-line);border-radius:12px;padding:7px 12px;text-shadow:1px 2px #17213a;box-shadow:0 3px #17213a55;font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.box .big{font-size:22px;color:var(--good)}
+.right{text-align:right;display:flex;gap:8px;align-items:flex-start}
+#timer.warn{color:#ff8fa3}
+.hudbtn{pointer-events:auto;border:2px solid var(--panel-line);background:var(--panel);color:#fff;border-radius:12px;width:44px;height:44px;font-size:18px;cursor:pointer;box-shadow:0 3px #17213a55}
+.hudbtn:focus-visible,.btn:focus-visible,.seg button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.qbox{position:absolute;z-index:2;top:84px;left:50%;transform:translateX(-50%);width:min(660px,90%);background:var(--paper);color:var(--ink);border:3px solid var(--wood);border-radius:16px;padding:8px 16px;text-align:center;box-shadow:0 5px #734c3c55}
+.qlabel{font-size:13px;color:#7b5a49;letter-spacing:.04em}
+.qword{font-size:clamp(20px,3vw,30px);line-height:1.5;margin-top:2px}
+.qword.jp{font-family:var(--f-jp);font-weight:800}
+.qword rt{font-size:.45em;font-weight:500;color:#8a6a5a}
+.qsub{font-size:12px;color:#675b60;margin-top:2px}
+.feedback{position:absolute;z-index:3;left:50%;top:215px;transform:translateX(-50%);font-size:20px;text-align:center;text-shadow:2px 2px #28304d;pointer-events:none;width:90%;font-family:var(--f-jp),var(--f-ko);font-weight:800}
+.layer{position:absolute;z-index:5;inset:0;background:rgba(18,25,50,.93);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;padding:22px;text-align:center;overflow:auto;touch-action:pan-y}
+.layer>:first-child{margin-top:auto}.layer>:last-child{margin-bottom:auto}
+h1{font-family:var(--f-jp);font-weight:800;font-size:clamp(34px,6.5vw,60px);margin:0;color:#fff3be;text-shadow:4px 5px #623e48;line-height:1.1}
+.sub{font-size:clamp(16px,2.4vw,22px);color:var(--gold);margin-top:-6px}
+.layer p{max-width:680px;line-height:1.7;color:var(--muted);margin:6px 0}
+.card{background:#272f50;border:2px solid #66749a;border-radius:15px;padding:12px 18px;max-width:720px;width:100%}
+.btn{border:0;border-radius:12px;padding:12px 22px;background:var(--gold);color:#493044;font-family:var(--f-ko);font-size:20px;box-shadow:0 5px var(--gold-deep);cursor:pointer}
+.btn:active{transform:translateY(3px);box-shadow:0 2px var(--gold-deep)}
+.btn.ghost{background:#3a4470;color:#fff;box-shadow:0 5px #1c2342;font-size:16px;padding:9px 16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+.seg{display:inline-flex;border:2px solid #66749a;border-radius:12px;overflow:hidden}
+.seg button{border:0;background:#1d2440;color:#cfd5ea;font-family:var(--f-ko);font-size:15px;padding:8px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--gold);color:#493044}
+.small{font-size:13px;color:#aab3cf}
+.touch{position:absolute;z-index:3;bottom:12px;left:12px;right:12px;display:flex;justify-content:space-between;pointer-events:none}
+.touch .grp{display:flex;gap:8px}
+.touch button{pointer-events:auto;width:56px;height:52px;border:2px solid #fff;border-radius:14px;color:#fff;background:#222a4dcc;font-size:20px;touch-action:none}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.stat{background:#1d2440;border-radius:10px;padding:8px 4px}
+.stat b{display:block;font-size:24px;color:var(--good);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:#aab3cf}
+.miss{max-height:190px;overflow:auto;text-align:left;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.miss div{background:#1d2440;border-radius:8px;padding:6px 10px;font-size:14px;min-width:0}
+.miss .j{font-family:var(--f-jp);font-weight:800;color:#fff3be}
+.miss .k{color:#cfd5ea;font-size:13px}
+@media(max-width:650px){.box{font-size:11px;padding:5px 8px}.box .big{font-size:16px}.qbox{top:66px;padding:6px 10px}.feedback{top:170px;font-size:16px}.touch button{width:48px;height:46px}.layer{padding:12px;gap:10px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.hudbtn{width:36px;height:36px;font-size:15px}}
+@media(prefers-reduced-motion:reduce){.btn:active{transform:none}}
+</style>
+
+</head>
+<body>
+<div id="wrap"><div id="frame"><canvas id="game" aria-label="게임 화면"></canvas>
+<div class="hud">
+  <div class="box" id="stats"><span class="big">0점</span><br>정답 0 / 0</div>
+  <div class="right"><div class="box" id="life"><span class="big" id="timer">5:00</span><br>콤보 0</div><button class="hudbtn" id="pauseBtn" aria-label="일시정지">⏸</button></div>
+</div>
+<div class="qbox"><div class="qlabel" id="qlabel">日本語 単語ラン</div><div class="qword" id="prompt">단어 카드가 다가오면 정답 길로!</div><div class="qsub" id="hint">좌우로 움직여 정답이 적힌 길을 고르세요.</div></div>
+<div class="feedback" id="feedback"></div>
+<div class="touch" id="touch" hidden><div class="grp"><button data-act="left" aria-label="왼쪽 길">◀</button><button data-act="right" aria-label="오른쪽 길">▶</button></div><div class="grp"><button data-act="jump" aria-label="점프">▲</button><button data-act="slide" aria-label="슬라이드">▼</button></div></div>
+
+<section class="layer" id="menu">
+  <h1>日本語 単語ラン</h1><div class="sub">일본어 어휘런</div>
+  <div class="card">
+    <p>단어 카드가 캐릭터 앞에 오면 <b>정답이 적힌 길</b>로 옮기세요. 맞힐 때마다 <b>10점</b>! 한 판은 <b>5분</b>입니다.</p>
+    <p class="small">← → / A·D 길 바꾸기 · ↑ / Space 보라 몬스터 점프 · ↓ 파란 날개 몬스터 슬라이드 · P 일시정지<br>젤리 8개를 모으면 별 파워가 나타나 몬스터를 무찌를 수 있어요.</p>
+  </div>
+  <div class="row">
+    <div class="seg" role="group" aria-label="문제 방향">
+      <button id="m-mix" data-mode="mix" aria-pressed="true">섞어서</button>
+      <button id="m-jk" data-mode="jk" aria-pressed="false">일본어 → 뜻</button>
+      <button id="m-kj" data-mode="kj" aria-pressed="false">뜻 → 일본어</button>
+    </div>
+    <div class="seg" role="group" aria-label="효과음">
+      <button id="snd-on" aria-pressed="true">🔊 소리 켜기</button>
+      <button id="snd-off" aria-pressed="false">🔇 끄기</button>
+    </div>
+  </div>
+  <button class="btn" id="start">달리기 시작</button>
+  <div class="small" id="deckInfo"></div>
+</section>
+<section class="layer" id="pause" hidden><h1>ちょっと休憩</h1><div class="sub">잠깐 쉬기</div><div class="row"><button class="btn" id="resume">계속 달리기</button><button class="btn ghost" id="quit">결과 보고 끝내기</button><button class="btn ghost" id="pauseHome">🏠 처음 화면</button></div></section>
+<section class="layer" id="over" hidden><h1>お疲れさま！</h1><div class="sub">5분 달리기 끝</div><div class="card" id="result"></div><div class="row"><button class="btn" id="again">새 단어로 다시 달리기</button><button class="btn ghost" id="toMenu">처음 화면</button></div></section>
+</div></div>
+
+<script>
+/* ---------- 어휘 데이터 (표기|읽기|뜻) : 고등학교 일본어 교육과정 기본 어휘 중심 ---------- */
+const RAW={
+exp:{인사:`こんにちは||안녕하세요(낮 인사)
+おはようございます||안녕하세요(아침 인사)
+こんばんは||안녕하세요(저녁 인사)
+さようなら||안녕히 가세요
+ありがとうございます||감사합니다
+すみません||죄송합니다, 실례합니다
+ごめんなさい||미안합니다
+いただきます||잘 먹겠습니다
+ごちそうさまでした||잘 먹었습니다
+おやすみなさい||안녕히 주무세요
+いってきます||다녀오겠습니다
+いってらっしゃい||다녀오세요
+ただいま||다녀왔습니다
+おかえりなさい||어서 와(귀가 인사)
+はじめまして||처음 뵙겠습니다
+よろしくおねがいします||잘 부탁드립니다
+いらっしゃいませ||어서 오세요(가게)
+おめでとうございます||축하합니다
+お元気ですか|おげんきですか|잘 지내세요?
+どういたしまして||천만에요
+失礼します|しつれいします|실례하겠습니다
+お疲れさまでした|おつかれさまでした|수고하셨습니다
+大丈夫です|だいじょうぶです|괜찮습니다
+お願いします|おねがいします|부탁합니다
+いいえ||아니요
+はい||네`},
+n:{
+사람:`私|わたし|나, 저
+家族|かぞく|가족
+父|ちち|(나의) 아버지
+母|はは|(나의) 어머니
+お父さん|おとうさん|아버지(남의 아버지, 호칭)
+お母さん|おかあさん|어머니(남의 어머니, 호칭)
+兄|あに|(나의) 형, 오빠
+姉|あね|(나의) 누나, 언니
+弟|おとうと|남동생
+妹|いもうと|여동생
+祖父|そふ|(나의) 할아버지
+祖母|そぼ|(나의) 할머니
+両親|りょうしん|부모님
+兄弟|きょうだい|형제
+子ども|こども|아이, 어린이
+友だち|ともだち|친구
+先生|せんせい|선생님
+学生|がくせい|학생
+人|ひと|사람
+男の人|おとこのひと|남자
+女の人|おんなのひと|여자
+赤ちゃん|あかちゃん|아기
+大人|おとな|어른
+彼|かれ|그, 그 남자
+彼女|かのじょ|그녀, 여자 친구
+医者|いしゃ|의사
+会社員|かいしゃいん|회사원
+歌手|かしゅ|가수
+警察官|けいさつかん|경찰관
+店員|てんいん|점원
+みんな||모두
+自分|じぶん|자기, 자신
+先輩|せんぱい|선배
+後輩|こうはい|후배
+夫|おっと|남편
+妻|つま|아내
+名前|なまえ|이름
+留学生|りゅうがくせい|유학생`,
+학교:`学校|がっこう|학교
+高校|こうこう|고등학교
+中学校|ちゅうがっこう|중학교
+大学|だいがく|대학교
+教室|きょうしつ|교실
+授業|じゅぎょう|수업
+宿題|しゅくだい|숙제
+試験|しけん|시험
+勉強|べんきょう|공부
+クラス||반, 학급
+教科書|きょうかしょ|교과서
+辞書|じしょ|사전
+本|ほん|책
+ノート||노트
+鉛筆|えんぴつ|연필
+消しゴム|けしゴム|지우개
+かばん||가방
+机|つくえ|책상
+いす||의자
+黒板|こくばん|칠판
+図書館|としょかん|도서관
+体育館|たいいくかん|체육관
+運動場|うんどうじょう|운동장
+夏休み|なつやすみ|여름 방학
+冬休み|ふゆやすみ|겨울 방학
+部活|ぶかつ|동아리 활동
+質問|しつもん|질문
+答え|こたえ|대답, 답
+問題|もんだい|문제
+日本語|にほんご|일본어
+英語|えいご|영어
+数学|すうがく|수학
+歴史|れきし|역사
+音楽|おんがく|음악
+美術|びじゅつ|미술
+体育|たいいく|체육
+科学|かがく|과학
+意味|いみ|의미, 뜻
+言葉|ことば|말, 단어
+漢字|かんじ|한자
+文字|もじ|문자, 글자
+作文|さくぶん|작문
+入学|にゅうがく|입학
+卒業|そつぎょう|졸업
+留学|りゅうがく|유학
+成績|せいせき|성적
+制服|せいふく|교복, 제복
+給食|きゅうしょく|급식
+テスト||테스트
+発表|はっぴょう|발표`,
+시간:`今日|きょう|오늘
+明日|あした|내일
+昨日|きのう|어제
+毎日|まいにち|매일
+朝|あさ|아침
+昼|ひる|낮, 점심
+夜|よる|밤
+晩|ばん|저녁
+今|いま|지금
+午前|ごぜん|오전
+午後|ごご|오후
+今週|こんしゅう|이번 주
+来週|らいしゅう|다음 주
+先週|せんしゅう|지난주
+今月|こんげつ|이번 달
+来月|らいげつ|다음 달
+先月|せんげつ|지난달
+今年|ことし|올해
+来年|らいねん|내년
+去年|きょねん|작년
+週末|しゅうまつ|주말
+時間|じかん|시간
+誕生日|たんじょうび|생일
+月曜日|げつようび|월요일
+火曜日|かようび|화요일
+水曜日|すいようび|수요일
+木曜日|もくようび|목요일
+金曜日|きんようび|금요일
+土曜日|どようび|토요일
+日曜日|にちようび|일요일
+春|はる|봄
+夏|なつ|여름
+秋|あき|가을
+冬|ふゆ|겨울
+季節|きせつ|계절
+今朝|けさ|오늘 아침
+今晩|こんばん|오늘 밤
+休み|やすみ|휴일, 쉬는 시간
+正月|しょうがつ|설날
+毎朝|まいあさ|매일 아침`,
+숫자:`一つ|ひとつ|하나
+二つ|ふたつ|둘
+三つ|みっつ|셋
+四つ|よっつ|넷
+五つ|いつつ|다섯
+十|じゅう|10, 열
+百|ひゃく|100, 백
+千|せん|1,000, 천
+万|まん|10,000, 만
+一人|ひとり|한 명
+二人|ふたり|두 명
+一日|ついたち|(달의) 1일
+八日|ようか|(달의) 8일
+二十日|はつか|(달의) 20일
+半|はん|반, 30분
+何時|なんじ|몇 시
+いくら||얼마
+いくつ||몇 개, 몇 살`,
+장소:`家|いえ|집
+部屋|へや|방
+台所|だいどころ|부엌
+トイレ||화장실
+駅|えき|역
+銀行|ぎんこう|은행
+病院|びょういん|병원
+郵便局|ゆうびんきょく|우체국
+公園|こうえん|공원
+店|みせ|가게
+会社|かいしゃ|회사
+映画館|えいがかん|영화관
+空港|くうこう|공항
+町|まち|마을, 동네
+国|くに|나라
+道|みち|길
+橋|はし|다리(교량)
+近く|ちかく|근처
+前|まえ|앞
+後ろ|うしろ|뒤
+上|うえ|위
+下|した|아래
+中|なか|안, 속
+外|そと|밖
+右|みぎ|오른쪽
+左|ひだり|왼쪽
+隣|となり|옆, 이웃
+コンビニ||편의점
+レストラン||레스토랑
+デパート||백화점
+スーパー||슈퍼마켓
+ホテル||호텔
+神社|じんじゃ|신사
+お寺|おてら|절
+温泉|おんせん|온천
+世界|せかい|세계
+東京|とうきょう|도쿄
+韓国|かんこく|한국
+日本|にほん|일본
+外国|がいこく|외국
+入口|いりぐち|입구
+出口|でぐち|출구
+所|ところ|곳, 장소
+喫茶店|きっさてん|찻집
+本屋|ほんや|서점`,
+음식:`ご飯|ごはん|밥, 식사
+朝ご飯|あさごはん|아침밥
+昼ご飯|ひるごはん|점심밥
+晩ご飯|ばんごはん|저녁밥
+水|みず|물
+お茶|おちゃ|차
+牛乳|ぎゅうにゅう|우유
+肉|にく|고기
+魚|さかな|생선, 물고기
+野菜|やさい|채소
+果物|くだもの|과일
+卵|たまご|달걀
+パン||빵
+りんご||사과
+みかん||귤
+お菓子|おかし|과자
+弁当|べんとう|도시락
+すし||초밥
+ラーメン||라면
+カレー||카레
+コーヒー||커피
+ジュース||주스
+ケーキ||케이크
+料理|りょうり|요리
+味|あじ|맛
+塩|しお|소금
+砂糖|さとう|설탕
+お酒|おさけ|술
+飲み物|のみもの|음료
+食べ物|たべもの|음식
+はし||젓가락
+皿|さら|접시
+コップ||컵
+牛肉|ぎゅうにく|소고기
+豚肉|ぶたにく|돼지고기
+鶏肉|とりにく|닭고기
+アイスクリーム||아이스크림
+チョコレート||초콜릿`,
+자연:`天気|てんき|날씨
+雨|あめ|비
+雪|ゆき|눈(날씨)
+風|かぜ|바람
+空|そら|하늘
+雲|くも|구름
+太陽|たいよう|태양
+月|つき|달
+星|ほし|별
+花|はな|꽃
+木|き|나무
+桜|さくら|벚꽃
+森|もり|숲
+石|いし|돌
+海|うみ|바다
+山|やま|산
+川|かわ|강
+犬|いぬ|개
+猫|ねこ|고양이
+鳥|とり|새
+動物|どうぶつ|동물
+台風|たいふう|태풍
+地震|じしん|지진
+晴れ|はれ|맑음
+曇り|くもり|흐림
+火|ひ|불
+池|いけ|연못
+島|しま|섬
+牛|うし|소
+馬|うま|말(동물)
+虫|むし|벌레
+自然|しぜん|자연`,
+몸:`体|からだ|몸
+頭|あたま|머리
+顔|かお|얼굴
+目|め|눈(신체)
+耳|みみ|귀
+口|くち|입
+鼻|はな|코
+手|て|손
+足|あし|발, 다리
+歯|は|이, 치아
+声|こえ|목소리
+髪|かみ|머리카락
+病気|びょうき|병
+薬|くすり|약
+風邪|かぜ|감기
+熱|ねつ|열
+心|こころ|마음
+気分|きぶん|기분
+けが||상처, 부상`,
+생활:`時計|とけい|시계
+電話|でんわ|전화
+携帯|けいたい|휴대 전화
+スマホ||스마트폰
+写真|しゃしん|사진
+傘|かさ|우산
+服|ふく|옷
+靴|くつ|신발, 구두
+帽子|ぼうし|모자
+眼鏡|めがね|안경
+お金|おかね|돈
+財布|さいふ|지갑
+切手|きって|우표
+手紙|てがみ|편지
+新聞|しんぶん|신문
+雑誌|ざっし|잡지
+窓|まど|창문
+ドア||문
+鍵|かぎ|열쇠
+テレビ||텔레비전
+パソコン||컴퓨터
+カメラ||카메라
+ベッド||침대
+シャツ||셔츠
+ズボン||바지
+スカート||치마
+プレゼント||선물
+お土産|おみやげ|(여행) 기념 선물
+荷物|にもつ|짐
+紙|かみ|종이
+箱|はこ|상자
+色|いろ|색
+物|もの|물건
+仕事|しごと|일, 직업
+買い物|かいもの|쇼핑, 장보기
+掃除|そうじ|청소
+洗濯|せんたく|빨래
+電気|でんき|전기, 전등
+番号|ばんごう|번호
+住所|じゅうしょ|주소
+メール||메일
+インターネット||인터넷
+アルバイト||아르바이트
+ニュース||뉴스`,
+교통:`電車|でんしゃ|전철
+地下鉄|ちかてつ|지하철
+バス||버스
+車|くるま|자동차
+自転車|じてんしゃ|자전거
+飛行機|ひこうき|비행기
+船|ふね|배(선박)
+タクシー||택시
+新幹線|しんかんせん|신칸센
+切符|きっぷ|표, 티켓
+旅行|りょこう|여행
+地図|ちず|지도
+信号|しんごう|신호등
+交差点|こうさてん|교차로
+道路|どうろ|도로
+パスポート||여권`,
+문화:`趣味|しゅみ|취미
+映画|えいが|영화
+歌|うた|노래
+絵|え|그림
+スポーツ||스포츠
+サッカー||축구
+野球|やきゅう|야구
+水泳|すいえい|수영
+読書|どくしょ|독서
+アニメ||애니메이션
+漫画|まんが|만화
+祭り|まつり|축제
+着物|きもの|기모노
+花火|はなび|불꽃놀이
+ピアノ||피아노
+ギター||기타
+ダンス||춤, 댄스
+ゲーム||게임
+コンサート||콘서트
+試合|しあい|시합
+練習|れんしゅう|연습
+夢|ゆめ|꿈
+約束|やくそく|약속
+話|はなし|이야기
+経験|けいけん|경험
+文化|ぶんか|문화
+意見|いけん|의견
+予定|よてい|예정
+準備|じゅんび|준비
+連絡|れんらく|연락
+用事|ようじ|볼일
+興味|きょうみ|흥미
+将来|しょうらい|장래
+環境|かんきょう|환경
+生活|せいかつ|생활
+理由|りゆう|이유
+気持ち|きもち|기분, 마음`},
+v:{동사:`行く|いく|가다
+来る|くる|오다
+帰る|かえる|돌아가다, 돌아오다
+食べる|たべる|먹다
+飲む|のむ|마시다
+見る|みる|보다
+聞く|きく|듣다, 묻다
+話す|はなす|이야기하다
+読む|よむ|읽다
+書く|かく|쓰다(글씨)
+買う|かう|사다
+売る|うる|팔다
+する||하다
+起きる|おきる|일어나다(기상)
+寝る|ねる|자다
+休む|やすむ|쉬다
+働く|はたらく|일하다
+遊ぶ|あそぶ|놀다
+会う|あう|만나다
+待つ|まつ|기다리다
+歩く|あるく|걷다
+走る|はしる|달리다
+泳ぐ|およぐ|헤엄치다
+乗る|のる|타다
+降りる|おりる|(탈것에서) 내리다
+降る|ふる|(비·눈이) 내리다
+入る|はいる|들어가다
+出る|でる|나가다, 나오다
+立つ|たつ|서다
+座る|すわる|앉다
+開ける|あける|열다
+閉める|しめる|닫다
+始まる|はじまる|시작되다
+終わる|おわる|끝나다
+教える|おしえる|가르치다
+習う|ならう|배우다
+覚える|おぼえる|기억하다, 외우다
+忘れる|わすれる|잊다
+分かる|わかる|이해하다, 알다
+知る|しる|알다(정보)
+思う|おもう|생각하다
+言う|いう|말하다
+作る|つくる|만들다
+使う|つかう|사용하다
+持つ|もつ|들다, 가지다
+送る|おくる|보내다
+貸す|かす|빌려주다
+借りる|かりる|빌리다
+返す|かえす|돌려주다
+住む|すむ|살다(거주)
+着る|きる|(옷을) 입다
+脱ぐ|ぬぐ|벗다
+洗う|あらう|씻다
+撮る|とる|(사진을) 찍다
+歌う|うたう|노래하다
+弾く|ひく|(악기를) 연주하다
+呼ぶ|よぶ|부르다
+答える|こたえる|대답하다
+選ぶ|えらぶ|고르다
+探す|さがす|찾다
+見せる|みせる|보여 주다
+手伝う|てつだう|돕다
+出かける|でかける|외출하다
+引っ越す|ひっこす|이사하다
+疲れる|つかれる|피곤하다, 지치다
+困る|こまる|곤란하다
+笑う|わらう|웃다
+泣く|なく|울다
+生まれる|うまれる|태어나다
+結婚する|けっこんする|결혼하다
+勉強する|べんきょうする|공부하다
+旅行する|りょこうする|여행하다
+散歩する|さんぽする|산책하다
+運動する|うんどうする|운동하다
+電話する|でんわする|전화하다
+料理する|りょうりする|요리하다
+もらう||받다
+あげる||주다(내가 남에게)
+くれる||주다(남이 나에게)
+ある||있다(사물)
+いる||있다(사람·동물)
+なる||되다
+できる||할 수 있다
+始める|はじめる|시작하다
+続ける|つづける|계속하다
+止まる|とまる|멈추다
+並ぶ|ならぶ|줄 서다
+渡る|わたる|건너다
+曲がる|まがる|돌다, 구부러지다
+急ぐ|いそぐ|서두르다
+頑張る|がんばる|힘내다, 분발하다
+信じる|しんじる|믿다
+感じる|かんじる|느끼다
+決める|きめる|정하다
+調べる|しらべる|조사하다
+集める|あつめる|모으다
+置く|おく|두다, 놓다
+取る|とる|잡다, 집다
+落とす|おとす|떨어뜨리다
+押す|おす|누르다, 밀다
+吸う|すう|들이마시다, 피우다
+死ぬ|しぬ|죽다
+休憩する|きゅうけいする|휴식하다`},
+ia:{い형용사:`大きい|おおきい|크다
+小さい|ちいさい|작다
+高い|たかい|높다, 비싸다
+安い|やすい|싸다
+低い|ひくい|낮다
+新しい|あたらしい|새롭다
+古い|ふるい|낡다, 오래되다
+いい||좋다
+悪い|わるい|나쁘다
+暑い|あつい|덥다
+寒い|さむい|춥다
+暖かい|あたたかい|따뜻하다
+涼しい|すずしい|시원하다
+熱い|あつい|뜨겁다
+冷たい|つめたい|차갑다
+長い|ながい|길다
+短い|みじかい|짧다
+多い|おおい|많다
+少ない|すくない|적다
+早い|はやい|(시간이) 이르다
+速い|はやい|(속도가) 빠르다
+遅い|おそい|늦다, 느리다
+近い|ちかい|가깝다
+遠い|とおい|멀다
+重い|おもい|무겁다
+軽い|かるい|가볍다
+広い|ひろい|넓다
+狭い|せまい|좁다
+明るい|あかるい|밝다
+暗い|くらい|어둡다
+おいしい||맛있다
+まずい||맛없다
+甘い|あまい|달다
+辛い|からい|맵다
+楽しい|たのしい|즐겁다
+うれしい||기쁘다
+悲しい|かなしい|슬프다
+面白い|おもしろい|재미있다
+難しい|むずかしい|어렵다
+易しい|やさしい|쉽다
+優しい|やさしい|상냥하다
+忙しい|いそがしい|바쁘다
+強い|つよい|강하다
+弱い|よわい|약하다
+痛い|いたい|아프다
+かわいい||귀엽다
+若い|わかい|젊다
+白い|しろい|하얗다
+黒い|くろい|검다
+赤い|あかい|빨갛다
+青い|あおい|파랗다
+黄色い|きいろい|노랗다
+怖い|こわい|무섭다
+眠い|ねむい|졸리다
+うるさい||시끄럽다
+汚い|きたない|더럽다
+太い|ふとい|굵다
+細い|ほそい|가늘다
+珍しい|めずらしい|드물다, 희귀하다
+すごい||굉장하다
+欲しい|ほしい|갖고 싶다
+寂しい|さびしい|외롭다, 쓸쓸하다
+恥ずかしい|はずかしい|부끄럽다
+危ない|あぶない|위험하다
+丸い|まるい|둥글다`},
+na:{な형용사:`好き|すき|좋아함
+嫌い|きらい|싫어함
+上手|じょうず|잘함, 능숙함
+下手|へた|서투름
+静か|しずか|조용함
+にぎやか||번화함, 떠들썩함
+きれい||예쁨, 깨끗함
+元気|げんき|건강함, 활기참
+有名|ゆうめい|유명함
+親切|しんせつ|친절함
+便利|べんり|편리함
+不便|ふべん|불편함
+大切|たいせつ|소중함
+大事|だいじ|중요함
+簡単|かんたん|간단함
+大変|たいへん|힘듦, 큰일임
+暇|ひま|한가함
+大丈夫|だいじょうぶ|괜찮음
+丈夫|じょうぶ|튼튼함
+同じ|おなじ|같음
+いろいろ||여러 가지
+残念|ざんねん|유감스러움
+心配|しんぱい|걱정
+安全|あんぜん|안전함
+危険|きけん|위험함
+自由|じゆう|자유로움
+必要|ひつよう|필요함
+特別|とくべつ|특별함
+真面目|まじめ|성실함
+素敵|すてき|멋짐
+幸せ|しあわせ|행복함
+無理|むり|무리임
+得意|とくい|자신 있음, 잘함
+苦手|にがて|잘 못함, 거북함
+大好き|だいすき|아주 좋아함
+複雑|ふくざつ|복잡함
+正直|しょうじき|정직함`},
+adv:{부사:`とても||매우
+少し|すこし|조금
+ちょっと||잠깐, 좀
+たくさん||많이
+もっと||더
+一番|いちばん|가장, 제일
+よく||잘, 자주
+時々|ときどき|때때로
+いつも||항상
+まだ||아직
+もう||벌써, 이미
+すぐ||곧, 바로
+ゆっくり||천천히
+一緒に|いっしょに|함께
+また||또
+全然|ぜんぜん|전혀
+たぶん||아마
+きっと||분명히, 꼭
+ぜひ||부디, 꼭
+だんだん||점점
+初めて|はじめて|처음으로
+まっすぐ||똑바로, 곧장
+本当に|ほんとうに|정말로
+あまり||그다지, 별로
+ちょうど||딱, 정확히
+やっと||겨우, 간신히
+特に|とくに|특히
+先に|さきに|먼저
+最近|さいきん|요즘, 최근
+大体|だいたい|대체로`,
+의문지시:`何|なに|무엇
+誰|だれ|누구
+どこ||어디
+いつ||언제
+どう||어떻게
+なぜ||왜
+どれ||어느 것
+どの||어느
+これ||이것
+それ||그것
+あれ||저것
+ここ||여기
+そこ||거기
+あそこ||저기
+こちら||이쪽
+どちら||어느 쪽
+そして||그리고
+でも||하지만
+だから||그래서
+それから||그러고 나서
+じゃあ||그럼`}
+};
+const VOCAB=[];
+for(const pos in RAW)for(const topic in RAW[pos])RAW[pos][topic].trim().split('\n').forEach(function(line){const p=line.split('|');if(p.length<3)return;VOCAB.push({id:VOCAB.length,jp:p[0].trim(),kana:p[1].trim(),ko:p[2].trim(),pos:pos,topic:topic})});
+const BYPOS={};VOCAB.forEach(function(w){(BYPOS[w.pos]=BYPOS[w.pos]||[]).push(w)});
+
+/* ---------- 효과음 (Web Audio 합성) ---------- */
+let AC=null,soundOn=true;
+function ac(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){AC=null}}if(AC&&AC.state==='suspended')AC.resume();return AC}
+function tone(f,d,type,v,f2,delay){const a=ac();if(!a||!soundOn)return;const t=a.currentTime+(delay||0),o=a.createOscillator(),g=a.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v||.12,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d+.03)}
+function noise(d,v,freq,delay){const a=ac();if(!a||!soundOn)return;const t=a.currentTime+(delay||0),len=Math.floor(a.sampleRate*d),buf=a.createBuffer(1,len,a.sampleRate),data=buf.getChannelData(0);for(let i=0;i<len;i++)data[i]=Math.random()*2-1;const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();s.buffer=buf;f.type='bandpass';f.frequency.value=freq||800;g.gain.setValueAtTime(v||.2,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);s.connect(f);f.connect(g);g.connect(a.destination);s.start(t);s.stop(t+d)}
+const SFX={
+ start:function(){[523,659,784,1047].forEach(function(f,i){tone(f,.15,'triangle',.18,0,i*.09)})},
+ lane:function(){tone(640,.05,'square',.045)},
+ jump:function(){tone(360,.22,'square',.07,820)},
+ slide:function(){noise(.22,.14,1400);tone(480,.2,'sawtooth',.04,170)},
+ jelly:function(){tone(1320,.07,'sine',.09);tone(1760,.09,'sine',.07,0,.05)},
+ quiz:function(){tone(880,.22,'triangle',.09);tone(1175,.3,'triangle',.08,0,.11)},
+ correct:function(){[784,988,1319].forEach(function(f,i){tone(f,.16,'triangle',.18,0,i*.07)});tone(2093,.28,'sine',.06,0,.22)},
+ wrong:function(){tone(330,.18,'sawtooth',.11,220);tone(220,.34,'sawtooth',.11,130,.16)},
+ hit:function(){noise(.2,.32,220);tone(150,.22,'square',.1,60)},
+ dodge:function(){tone(700,.08,'triangle',.08,1050)},
+ power:function(){[523,659,784,1047,1319,1568].forEach(function(f,i){tone(f,.12,'square',.07,0,i*.05)})},
+ smash:function(){noise(.12,.22,700);tone(900,.1,'square',.06,1500)},
+ combo:function(){[1047,1319,1568,2093].forEach(function(f,i){tone(f,.11,'sine',.1,0,i*.06)})},
+ tick:function(){tone(1000,.05,'square',.07)},
+ pause:function(){tone(620,.12,'sine',.08,380)},
+ over:function(){[784,659,523,659,784,1047].forEach(function(f,i){tone(f,.22,'triangle',.15,0,i*.14)})}
+};
+
+/* ---------- 출제 순서: 판마다 아직 안 나온 단어부터 ---------- */
+const DECK_KEY='jpWordRunDeck_v1';
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=a[i];a[i]=a[j];a[j]=t}return a}
+function loadDeck(){try{const d=JSON.parse(localStorage.getItem(DECK_KEY)||'null');if(d&&d.size===VOCAB.length&&Array.isArray(d.order))return d}catch(e){}return {size:VOCAB.length,order:shuffle(VOCAB.map(function(w){return w.id})),pos:0,round:1}}
+let DECK=loadDeck();
+function saveDeck(){try{localStorage.setItem(DECK_KEY,JSON.stringify(DECK))}catch(e){}}
+function nextWord(){if(DECK.pos>=DECK.order.length){DECK.order=shuffle(DECK.order);DECK.pos=0;DECK.round=(DECK.round||1)+1}const w=VOCAB[DECK.order[DECK.pos++]];saveDeck();return w}
+function deckInfo(){$('deckInfo').textContent='단어장 '+VOCAB.length+'개 · '+(DECK.round||1)+'회차 '+DECK.pos+'개 출제됨 · 새 판은 아직 안 나온 단어부터 나옵니다'}
+
+/* ---------- 게임 ---------- */
+const $=function(id){return document.getElementById(id)},cv=$('game'),ctx=cv.getContext('2d');
+const lanes=[.25,.5,.75],SET_TIME=300;let G=null,raf=0,last=0,toastTimer=0,mode='mix';
+const FJP='"M PLUS Rounded 1c","Jua","Malgun Gothic",sans-serif',FKO='"Jua","M PLUS Rounded 1c","Malgun Gothic",sans-serif';
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function rubyHTML(w){return w.kana&&w.kana!==w.jp?'<ruby>'+esc(w.jp)+'<rt>'+esc(w.kana)+'</rt></ruby>':esc(w.jp)}
+function jpPlain(w){return w.kana&&w.kana!==w.jp?w.jp+'('+w.kana+')':w.jp}
+function makeQuiz(){
+ const it=nextWord(),dir=mode==='mix'?(Math.random()<.5?'jk':'kj'):mode;
+ const pool=BYPOS[it.pos].filter(function(x){return x.id!==it.id&&x.ko!==it.ko&&x.jp!==it.jp});
+ let cands=shuffle(pool.filter(function(x){return x.topic===it.topic}));if(cands.length<2)cands=shuffle(pool);
+ const picks=[];for(const c of cands){if(picks.length>=2)break;if(picks.every(function(p){return p.ko!==c.ko&&p.jp!==c.jp}))picks.push(c)}
+ const choices=shuffle([it].concat(picks));
+ return {at:G.distance+940,answer:it,dir:dir,choices:choices,correctLane:choices.indexOf(it),resolved:false}
+}
+function showQuizPrompt(q){
+ if(q.dir==='jk'){$('qlabel').textContent='이 일본어의 뜻은?';$('prompt').className='qword jp';$('prompt').innerHTML=rubyHTML(q.answer)}
+ else{$('qlabel').textContent='이 뜻에 맞는 일본어는?';$('prompt').className='qword';$('prompt').textContent=q.answer.ko}
+ $('hint').textContent='정답 카드가 있는 길로 옮기세요 · 맞히면 +10점';
+}
+function start(){
+ ac();SFX.start();
+ G={state:'play',time:SET_TIME,lastTick:11,distance:0,score:0,lane:1,laneVisual:1,jump:0,slide:0,inv:0,speed:250,combo:0,maxCombo:0,correct:0,asked:0,missed:[],jellyCount:0,jellyCharge:0,powerPickup:null,powerActive:0,obstacles:[],jellies:[],floats:[],quiz:null,nextQuiz:700,nextObstacle:380,nextJelly:180,flash:0};
+ $('qlabel').textContent='日本語 単語ラン';$('prompt').className='qword';$('prompt').textContent='준비! 첫 단어가 곧 나와요';$('hint').textContent='젤리를 모으고 몬스터를 피하세요.';
+ $('menu').hidden=true;$('pause').hidden=true;$('over').hidden=true;$('touch').hidden=false;
+ resize();last=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)
+}
+function changeLane(d){if(!G||G.state!=='play')return;const n=Math.max(0,Math.min(2,G.lane+d));if(n!==G.lane){G.lane=n;SFX.lane()}}
+function jump(){if(G&&G.state==='play'&&G.jump<=0&&G.slide<=0){G.jump=.78;SFX.jump()}}
+function slide(){if(G&&G.state==='play'&&G.slide<=0&&G.jump<=0){G.slide=.58;SFX.slide()}}
+function toast(text,good){$('feedback').textContent=text;$('feedback').style.color=good?'var(--good)':'var(--bad)';clearTimeout(toastTimer);toastTimer=setTimeout(function(){$('feedback').textContent=''},1800)}
+function floatText(txt,color){const w=cv.clientWidth,h=cv.clientHeight;G.floats.push({txt:txt,color:color,x:w*(.25+.25*G.laneVisual),y:h*.81-50,life:1})}
+function resolveQuiz(){
+ const q=G.quiz;if(!q||q.resolved)return;q.resolved=true;G.asked++;
+ const ok=Math.round(G.laneVisual)===q.correctLane;
+ if(ok){G.correct++;G.combo++;G.maxCombo=Math.max(G.maxCombo,G.combo);G.score+=10;G.speed=Math.min(380,G.speed+4);floatText('+10','#fff36a');
+  if(G.combo>0&&G.combo%5===0){SFX.combo();toast(G.combo+'연속 정답! すごい！',true)}else{SFX.correct();toast('正解！ '+jpPlain(q.answer)+' = '+q.answer.ko,true)}}
+ else{G.combo=0;G.flash=.2;if(!G.missed.some(function(m){return m.id===q.answer.id}))G.missed.push(q.answer);SFX.wrong();toast('정답은 '+jpPlain(q.answer)+' = '+q.answer.ko,false)}
+ $('qlabel').textContent=ok?'정답! 복습해요':'오답! 정답을 확인하세요';$('prompt').className='qword jp';$('prompt').innerHTML=rubyHTML(q.answer)+' <span style="font-family:var(--f-ko);font-weight:400;font-size:.7em">— '+esc(q.answer.ko)+'</span>';
+ $('hint').textContent=ok?'+10점 · 콤보 '+G.combo:'다음 단어에서 만회해요!';
+ G.quiz=null;G.nextQuiz=G.distance+1150
+}
+function finish(){
+ if(!G||G.state==='over')return;G.state='over';cancelAnimationFrame(raf);$('touch').hidden=true;$('pause').hidden=true;$('over').hidden=false;SFX.over();
+ const rate=G.asked?Math.round(G.correct/G.asked*100):0;
+ let html='<div class="stats"><div class="stat"><b>'+G.score+'</b><span>점수</span></div><div class="stat"><b>'+G.correct+'/'+G.asked+'</b><span>정답 / 출제</span></div><div class="stat"><b>'+rate+'%</b><span>정답률</span></div><div class="stat"><b>'+G.maxCombo+'</b><span>최고 연속 정답</span></div></div>';
+ if(G.missed.length){html+='<p style="margin:4px 0 8px">다시 볼 단어 '+G.missed.length+'개</p><div class="miss">'+G.missed.map(function(w){return '<div><span class="j">'+esc(w.jp)+'</span>'+(w.kana&&w.kana!==w.jp?' <span class="k">'+esc(w.kana)+'</span>':'')+'<br><span class="k">'+esc(w.ko)+'</span></div>'}).join('')+'</div>'}
+ else if(G.asked)html+='<p>틀린 단어가 하나도 없어요. 完璧！</p>';
+ $('result').innerHTML=html;deckInfo()
+}
+function hit(){if(G.inv>0)return;G.combo=G.combo;G.inv=1.3;G.flash=.25;G.speed=Math.max(220,G.speed-35);SFX.hit();toast('앗! 몬스터와 부딪혀 속도가 줄었어요',false)}
+function update(dt){
+ if(!G||G.state!=='play')return;
+ G.time-=dt;const sec=Math.ceil(G.time);if(sec<=10&&sec<G.lastTick&&sec>0){G.lastTick=sec;SFX.tick()}
+ if(G.time<=0){G.time=0;renderHud();finish();return}
+ G.distance+=G.speed*dt;G.laneVisual+=(G.lane-G.laneVisual)*Math.min(1,dt*9);G.speed=Math.min(380,G.speed+dt*1.2);
+ G.jump=Math.max(0,G.jump-dt);G.slide=Math.max(0,G.slide-dt);G.inv=Math.max(0,G.inv-dt);G.flash=Math.max(0,G.flash-dt);
+ for(const f of G.floats){f.life-=dt*1.1;f.y-=dt*60}G.floats=G.floats.filter(function(f){return f.life>0});
+ if(G.distance>=G.nextJelly){G.jellies.push({at:G.distance+900,lane:Math.floor(Math.random()*3),dead:false});G.nextJelly+=185+Math.random()*75}
+ if(G.distance>=G.nextObstacle){let at=G.distance+870;if(G.quiz&&Math.abs(at-G.quiz.at)<650)at=G.quiz.at+650;G.obstacles.push({at:at,lane:Math.floor(Math.random()*3),type:Math.random()<.67?'rock':'bird',dead:false});G.nextObstacle+=470+Math.random()*240}
+ if(!G.quiz&&G.distance>=G.nextQuiz){G.quiz=makeQuiz();showQuizPrompt(G.quiz);SFX.quiz();const q=G.quiz;G.obstacles=G.obstacles.filter(function(o){return Math.abs(o.at-q.at)>600});G.jellies=G.jellies.filter(function(j){return Math.abs(j.at-q.at)>80})}
+ const pass=G.distance+25;G.powerActive=Math.max(0,G.powerActive-dt);
+ for(const o of G.obstacles){if(o.dead)continue;if(Math.abs(o.at-pass)<G.speed*dt+8&&Math.abs(o.lane-G.laneVisual)<.42){const powered=G.powerActive>0,safe=o.type==='rock'?G.jump>.12:G.slide>.12;o.dead=true;if(powered){SFX.smash();toast('별 파워로 몬스터 격파!',true)}else if(safe){SFX.dodge();toast(o.type==='rock'?'멋진 점프!':'날쌘 슬라이드!',true)}else hit()}}
+ if(G.powerPickup&&G.powerPickup.at<G.distance-100)G.powerPickup=null;
+ if(!G.powerPickup&&G.powerActive<=0&&G.jellyCharge>=8)G.powerPickup={at:G.distance+650,lane:G.lane};
+ if(G.powerPickup&&Math.abs(G.powerPickup.at-pass)<G.speed*dt+12&&Math.abs(G.powerPickup.lane-G.laneVisual)<.42){G.powerPickup=null;G.powerActive=8;G.jellyCharge=Math.max(0,G.jellyCharge-8);SFX.power();toast('별 파워! 8초 동안 몬스터를 무찌르세요!',true)}
+ for(const j of G.jellies){if(!j.dead&&Math.abs(j.at-pass)<G.speed*dt+10&&Math.abs(j.lane-G.laneVisual)<.42){j.dead=true;G.jellyCount++;G.jellyCharge++;SFX.jelly();if(G.jellyCharge>=8&&!G.powerPickup&&G.powerActive<=0){G.powerPickup={at:G.distance+720,lane:G.lane};toast('젤리 8개! 별 파워가 나타났어요',true)}}}
+ G.obstacles=G.obstacles.filter(function(o){return !o.dead&&o.at>G.distance-100});G.jellies=G.jellies.filter(function(j){return !j.dead&&j.at>G.distance-100});
+ if(G.quiz&&G.distance>=G.quiz.at)resolveQuiz();
+ renderHud()
+}
+function renderHud(){
+ const t=Math.max(0,Math.ceil(G.time)),mm=Math.floor(t/60),ss=('0'+t%60).slice(-2);
+ $('stats').innerHTML='<span class="big">'+G.score+'점</span><br>정답 '+G.correct+' / '+G.asked+'<br>'+(G.powerActive>0?'⭐ 파워 '+Math.ceil(G.powerActive)+'초':'⭐ 젤리 '+Math.min(8,G.jellyCharge)+'/8');
+ $('life').innerHTML='<span class="big" id="timer">⏱ '+mm+':'+ss+'</span><br>콤보 '+G.combo;
+ $('timer').classList.toggle('warn',t<=30)
+}
+function resize(){const r=cv.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2);cv.width=Math.max(1,Math.round(r.width*d));cv.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);if(G&&G.state!=='play')draw()}
+function round(x,y,w,h,r,fill,stroke){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
+function drawRoad(w,h){const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#78c9ec');sky.addColorStop(.58,'#d1f4fc');sky.addColorStop(.59,'#8bcf84');sky.addColorStop(1,'#52aa71');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+ const dist=G?G.distance:0;
+ // 먼 산과 도리이
+ ctx.fillStyle='#a9d8c0';ctx.beginPath();ctx.moveTo(0,h*.59);for(let i=0;i<=8;i++){const x=i*w/8;ctx.lineTo(x,h*.59-(i%2?h*.07:h*.03))}ctx.lineTo(w,h*.59);ctx.fill();
+ ctx.fillStyle='#ffffffcc';ctx.beginPath();ctx.moveTo(w*.78,h*.59);ctx.lineTo(w*.86,h*.44);ctx.lineTo(w*.94,h*.59);ctx.fill();ctx.fillStyle='#7aa8c9';ctx.beginPath();ctx.moveTo(w*.735,h*.59);ctx.lineTo(w*.8,h*.505);ctx.quadraticCurveTo(w*.86,h*.48,w*.92,h*.505);ctx.lineTo(w*.985,h*.59);ctx.fill();
+ for(let i=0;i<5;i++){const x=((i*230-dist*.12)%(w+180)+w+180)%(w+180)-80,y=h*.2+(i%2)*h*.05;ctx.fillStyle='#fff9';ctx.beginPath();ctx.arc(x,y,22,0,7);ctx.arc(x+27,y-10,28,0,7);ctx.arc(x+58,y,20,0,7);ctx.fill()}
+ const vx=w/2,vy=h*.25;ctx.fillStyle='#8d694f';ctx.beginPath();ctx.moveTo(vx-48,vy);ctx.lineTo(vx+48,vy);ctx.lineTo(w*.96,h);ctx.lineTo(w*.04,h);ctx.closePath();ctx.fill();ctx.fillStyle='#c59465';ctx.beginPath();ctx.moveTo(vx-34,vy);ctx.lineTo(vx+34,vy);ctx.lineTo(w*.88,h);ctx.lineTo(w*.12,h);ctx.closePath();ctx.fill();
+ ctx.strokeStyle='#ffe2a8';ctx.lineWidth=3;for(let i=0;i<2;i++){const x=vx+(i-.5)*18;ctx.beginPath();ctx.moveTo(x,vy);ctx.lineTo(w*(.375+.25*i),h);ctx.stroke()}
+ ctx.strokeStyle='#f4d495';for(let i=0;i<3;i++){const y=vy+((dist*.6+i*125)%(h*.7));const t=(y-vy)/(h-vy),x1=vx+(w*.12-vx)*t,x2=vx+(w*.88-vx)*t;ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.stroke()}}
+function yFor(at,h){return h*.81-(at-G.distance)*.31}
+function drawRunner(x,y,t){ctx.save();ctx.translate(x,y+Math.sin(t*12)*3);if(G.inv>0&&Math.floor(t*18)%2)ctx.globalAlpha=.35;ctx.fillStyle='#754634';ctx.beginPath();ctx.ellipse(0,18,21,7,0,0,7);ctx.fill();const g=ctx.createRadialGradient(-7,-15,3,0,0,31);g.addColorStop(0,'#ffd987');g.addColorStop(1,'#c8783e');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,25,0,7);ctx.fill();ctx.strokeStyle='#7d4a32';ctx.lineWidth=3;ctx.stroke();
+ // 머리띠(はちまき)
+ ctx.fillStyle='#fff';ctx.fillRect(-24,-17,48,7);ctx.fillStyle='#e8464f';ctx.beginPath();ctx.arc(0,-13.5,3,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(22,-15);ctx.lineTo(34,-22+Math.sin(t*20)*3);ctx.lineTo(33,-12);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-8,-2,6,0,7);ctx.arc(8,-2,6,0,7);ctx.fill();ctx.fillStyle='#3b2b39';ctx.beginPath();ctx.arc(-7,-1,2.5,0,7);ctx.arc(9,-1,2.5,0,7);ctx.fill();ctx.fillStyle='#ed7d77';ctx.beginPath();ctx.arc(-16,7,4,0,7);ctx.arc(16,7,4,0,7);ctx.fill();ctx.strokeStyle='#70404a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(1,6,5,.15,Math.PI-.15);ctx.stroke();
+ if(G.powerActive>0){ctx.strokeStyle='#fff36a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,32,0,Math.PI*2);ctx.stroke()}
+ ctx.fillStyle='#754634';ctx.beginPath();ctx.ellipse(-13,23,7,4,0,0,7);ctx.ellipse(13,23,7,4,0,0,7);ctx.fill();ctx.restore()}
+function monster(x,y,type){ctx.save();ctx.translate(x,y);if(type==='rock'){ctx.fillStyle='#9867cf';ctx.beginPath();ctx.moveTo(-26,17);ctx.quadraticCurveTo(-32,-7,-14,-18);ctx.lineTo(-8,-29);ctx.lineTo(0,-18);ctx.lineTo(12,-28);ctx.lineTo(16,-14);ctx.quadraticCurveTo(33,-4,25,17);ctx.quadraticCurveTo(0,28,-26,17);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-8,-3,6,0,7);ctx.arc(9,-3,6,0,7);ctx.fill();ctx.fillStyle='#30273c';ctx.beginPath();ctx.arc(-7,-2,2.5,0,7);ctx.arc(10,-2,2.5,0,7);ctx.fill();ctx.fillStyle='#ff9aa8';ctx.beginPath();ctx.arc(-17,7,4,0,7);ctx.arc(18,7,4,0,7);ctx.fill()}else{ctx.fillStyle='#4b72bd';ctx.beginPath();ctx.ellipse(0,0,29,15,0,0,7);ctx.ellipse(-16,-5,12,8,-.5,0,7);ctx.ellipse(16,-5,12,8,.5,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-7,0,5,0,7);ctx.arc(8,0,5,0,7);ctx.fill();ctx.fillStyle='#222c46';ctx.beginPath();ctx.arc(-6,1,2,0,7);ctx.arc(9,1,2,0,7);ctx.fill()}ctx.strokeStyle='#38213b';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-14,-11);ctx.lineTo(-5,-7);ctx.moveTo(14,-11);ctx.lineTo(5,-7);ctx.stroke();ctx.beginPath();ctx.moveTo(-6,12);ctx.quadraticCurveTo(0,6,6,12);ctx.stroke();ctx.restore()}
+function wrapText(txt,maxW){const out=[];let line='';for(const ch of Array.from(txt)){const test=line+ch;if(ctx.measureText(test).width>maxW&&line){let cut=line.lastIndexOf(' ');if(cut>0&&ch!==' '){out.push(line.slice(0,cut));line=line.slice(cut+1)+ch}else{out.push(line.trim());line=ch===' '?'':ch}}else line=test}if(line.trim())out.push(line.trim());return out}
+function drawCard(x,y,cw,item,showJp,i){
+ const inner=cw-14;let lines=[],sub='',size;
+ ctx.textAlign='center';ctx.textBaseline='middle';
+ if(showJp){size=Math.min(24,cw*.17);ctx.font='800 '+size+'px '+FJP;while(ctx.measureText(item.jp).width>inner&&size>10){size-=1;ctx.font='800 '+size+'px '+FJP}lines=[item.jp];if(item.kana&&item.kana!==item.jp)sub=item.kana}
+ else{size=Math.min(19,cw*.13);ctx.font=size+'px '+FKO;lines=wrapText(item.ko,inner);while(lines.length>3&&size>10){size-=1;ctx.font=size+'px '+FKO;lines=wrapText(item.ko,inner)}}
+ const lh=size*1.2,subH=sub?13:0,ch=Math.max(70,lines.length*lh+subH+30);
+ round(x-cw/2,y-ch/2,cw,ch,13,'#f7dca0','#7e5b48');
+ let yy=y-(lines.length*lh+subH)/2+lh/2-6;
+ if(sub){let ss=Math.min(12,size*.6);ctx.font='500 '+ss+'px '+FJP;while(ctx.measureText(sub).width>inner&&ss>8){ss-=.5;ctx.font='500 '+ss+'px '+FJP}ctx.fillStyle='#8a6a5a';ctx.fillText(sub,x,yy-2);yy+=subH}
+ ctx.fillStyle='#342a38';ctx.font=(showJp?'800 ':'')+size+'px '+(showJp?FJP:FKO);for(const l of lines){ctx.fillText(l,x,yy);yy+=lh}
+ ctx.fillStyle='#7e5b48';ctx.font='11px '+FKO;ctx.fillText('길 '+(i+1),x,y+ch/2-10)
+}
+function draw(){
+ if(!G)return;const w=cv.clientWidth,h=cv.clientHeight;ctx.clearRect(0,0,w,h);drawRoad(w,h);
+ for(const o of G.obstacles){const y=yFor(o.at,h);if(y<100||y>h+50)continue;monster(w*lanes[o.lane],y,o.type)}
+ if(G.powerPickup){const py=yFor(G.powerPickup.at,h),px=w*lanes[G.powerPickup.lane];if(py>100&&py<h+40){ctx.save();ctx.translate(px,py);ctx.shadowColor='#fff36a';ctx.shadowBlur=24;ctx.fillStyle='#ffe45d';ctx.strokeStyle='#fff9ce';ctx.lineWidth=3;ctx.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?11:21;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}}
+ for(const j of G.jellies){const y=yFor(j.at,h);if(y<100||y>h+30)continue;const x=w*lanes[j.lane],bob=Math.sin(G.distance*.03)*2;ctx.save();ctx.translate(x,y+bob);ctx.rotate(Math.sin(G.distance*.015)*.12);ctx.fillStyle='#ff8fb4';ctx.strokeStyle='#fff0ba';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,-15);ctx.bezierCurveTo(15,-15,16,-1,9,9);ctx.lineTo(3,16);ctx.quadraticCurveTo(0,19,-3,16);ctx.lineTo(-9,9);ctx.bezierCurveTo(-16,-1,-15,-15,0,-15);ctx.fill();ctx.stroke();ctx.fillStyle='#fff7d8';ctx.beginPath();ctx.ellipse(-5,-7,3,5,-.3,0,7);ctx.fill();ctx.restore()}
+ if(G.quiz){const y=yFor(G.quiz.at,h),cw=Math.min(184,w*.235);if(y>70&&y<h+90)for(let i=0;i<3;i++)drawCard(w*lanes[i],y,cw,G.quiz.choices[i],G.quiz.dir==='kj',i)}
+ const laneX=w*(.25+.25*G.laneVisual),laneY=h*.81,t=performance.now()/1000;ctx.fillStyle='#fff8c566';ctx.beginPath();ctx.ellipse(laneX,laneY+26,31,8,0,0,7);ctx.fill();
+ if(G.jump>0){const lift=Math.sin((.78-G.jump)/.78*Math.PI)*68;drawRunner(laneX,laneY-lift,t)}else if(G.slide>0){ctx.fillStyle='#ffd987';ctx.beginPath();ctx.ellipse(laneX,laneY+17,31,13,0,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(laneX-30,laneY+10,60,4)}else drawRunner(laneX,laneY,t);
+ for(const f of G.floats){ctx.save();ctx.globalAlpha=Math.max(0,f.life);ctx.font='900 30px '+FKO;ctx.textAlign='center';ctx.lineWidth=5;ctx.strokeStyle='#5a3a2a';ctx.strokeText(f.txt,f.x,f.y);ctx.fillStyle=f.color;ctx.fillText(f.txt,f.x,f.y);ctx.restore()}
+ if(G.flash>0){ctx.fillStyle='rgba(255,70,90,'+(G.flash*1.5)+')';ctx.fillRect(0,0,w,h)}
+}
+function loop(now){const dt=Math.min(.033,(now-last)/1000);last=now;update(dt);draw();if(G&&G.state==='play')raf=requestAnimationFrame(loop)}
+function act(a){if(a==='left')changeLane(-1);if(a==='right')changeLane(1);if(a==='jump')jump();if(a==='slide')slide()}
+function pauseGame(){if(G&&G.state==='play'){G.state='pause';$('pause').hidden=false;cancelAnimationFrame(raf);SFX.pause()}}
+function resumeGame(){if(G&&G.state==='pause'){G.state='play';$('pause').hidden=true;last=performance.now();raf=requestAnimationFrame(loop);ac()}}
+window.addEventListener('keydown',function(e){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)&&G&&G.state==='play')e.preventDefault();if(e.repeat)return;const k=e.key;if(k==='ArrowLeft'||k==='a'||k==='A')act('left');if(k==='ArrowRight'||k==='d'||k==='D')act('right');if(k==='ArrowUp'||k===' ')act('jump');if(k==='ArrowDown'||k==='s'||k==='S')act('slide');if(k==='p'||k==='P'||k==='Escape'){if(G&&G.state==='play')pauseGame();else if(G&&G.state==='pause')resumeGame()}});
+document.querySelectorAll('[data-act]').forEach(function(b){b.addEventListener('pointerdown',function(e){e.preventDefault();act(b.dataset.act)})});
+document.querySelectorAll('[data-mode]').forEach(function(b){b.onclick=function(){mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});ac();SFX.lane()}});
+$('snd-on').onclick=function(){soundOn=true;$('snd-on').setAttribute('aria-pressed','true');$('snd-off').setAttribute('aria-pressed','false');SFX.jelly()};
+$('snd-off').onclick=function(){soundOn=false;$('snd-on').setAttribute('aria-pressed','false');$('snd-off').setAttribute('aria-pressed','true')};
+$('start').onclick=start;$('again').onclick=start;$('resume').onclick=resumeGame;$('quit').onclick=finish;$('pauseBtn').onclick=function(){if(G&&G.state==='play')pauseGame();else resumeGame()};
+function goMenu(){
+ cancelAnimationFrame(raf);clearTimeout(toastTimer);$('feedback').textContent='';
+ $('over').hidden=true;$('pause').hidden=true;$('touch').hidden=true;$('menu').hidden=false;
+ G={state:'idle',distance:0,laneVisual:1,jump:0,slide:0,inv:0,powerActive:0,obstacles:[],jellies:[],floats:[],quiz:null,flash:0};
+ $('stats').innerHTML='<span class="big">0점</span><br>정답 0 / 0';
+ $('life').innerHTML='<span class="big" id="timer">5:00</span><br>콤보 0';
+ $('qlabel').textContent='日本語 単語ラン';$('prompt').className='qword';$('prompt').textContent='단어 카드가 다가오면 정답 길로!';$('hint').textContent='좌우로 움직여 정답이 적힌 길을 고르세요.';
+ resize();draw();deckInfo();$('start').focus()
+}
+$('toMenu').onclick=goMenu;$('pauseHome').onclick=goMenu;
+window.addEventListener('keydown',function(e){if((e.key==='h'||e.key==='H')&&G&&(G.state==='pause'||G.state==='over'))goMenu()});
+if(window.ResizeObserver)new ResizeObserver(resize).observe(cv);window.addEventListener('resize',resize);
+if(document.fonts&&document.fonts.load){document.fonts.load('800 20px "M PLUS Rounded 1c"','日本語学校').catch(function(){});document.fonts.load('20px "Jua"','한국어 뜻').catch(function(){})}
+G={state:'idle',distance:0,laneVisual:1,jump:0,slide:0,inv:0,powerActive:0,obstacles:[],jellies:[],floats:[],quiz:null,flash:0};resize();draw();deckInfo();
+</script>
+
+</body>
+</html>
